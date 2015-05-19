@@ -713,6 +713,34 @@ func ActivateDevice(poolName string, name string, deviceId int, size uint64) err
 	return nil
 }
 
+func ActivateDeviceWithExternal(poolName string, name string, deviceId int, size uint64, externalDev string) error {
+	task, err := TaskCreateNamed(DeviceCreate, name)
+	if task == nil {
+		return err
+	}
+
+	params := fmt.Sprintf("%s %d %s", poolName, deviceId, externalDev)
+	if err := task.AddTarget(0, size/512, "thin", params); err != nil {
+		return fmt.Errorf("Can't add target %s", err)
+	}
+	if err := task.SetAddNode(AddNodeOnCreate); err != nil {
+		return fmt.Errorf("Can't add node %s", err)
+	}
+
+	var cookie uint = 0
+	if err := task.SetCookie(&cookie, 0); err != nil {
+		return fmt.Errorf("Can't set cookie %s", err)
+	}
+
+	defer UdevWait(&cookie)
+
+	if err := task.Run(); err != nil {
+		return fmt.Errorf("Error running DeviceCreate (ActivateDevice) %s", err)
+	}
+
+	return nil
+}
+
 func CreateSnapDevice(poolName string, deviceId int, baseName string, baseDeviceId int) error {
 	devinfo, _ := GetInfo(baseName)
 	doSuspend := devinfo != nil && devinfo.Exists != 0
